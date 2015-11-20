@@ -68,29 +68,22 @@ class WSGIErrorsWrapper(io.RawIOBase):
             stream.flush()
 
 
-def base_environ(cfg):
+def default_environ(req, sock, cfg):
     return {
+        "wsgi.input": req.body,
         "wsgi.errors": WSGIErrorsWrapper(cfg),
         "wsgi.version": (1, 0),
         "wsgi.multithread": False,
         "wsgi.multiprocess": (cfg.workers > 1),
         "wsgi.run_once": False,
         "wsgi.file_wrapper": FileWrapper,
-        "SERVER_SOFTWARE": SERVER_SOFTWARE,
-    }
-
-
-def default_environ(req, sock, cfg):
-    env = base_environ(cfg)
-    env.update({
-        "wsgi.input": req.body,
         "gunicorn.socket": sock,
+        "SERVER_SOFTWARE": SERVER_SOFTWARE,
         "REQUEST_METHOD": req.method,
         "QUERY_STRING": req.query,
         "RAW_URI": req.uri,
         "SERVER_PROTOCOL": "HTTP/%s" % ".".join([str(v) for v in req.version])
-    })
-    return env
+    }
 
 
 def proxy_environ(req):

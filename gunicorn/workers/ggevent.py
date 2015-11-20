@@ -26,7 +26,6 @@ from gevent.socket import wait_write, socket
 from gevent import pywsgi
 
 import gunicorn
-from gunicorn.http.wsgi import base_environ
 from gunicorn.workers.async import AsyncWorker
 from gunicorn.http.wsgi import sendfile as o_sendfile
 
@@ -47,6 +46,16 @@ def patch_sendfile():
 
     if o_sendfile is not None:
         setattr(wsgi, "sendfile", _gevent_sendfile)
+
+BASE_WSGI_ENV = {
+    'GATEWAY_INTERFACE': 'CGI/1.1',
+    'SERVER_SOFTWARE': VERSION,
+    'SCRIPT_NAME': '',
+    'wsgi.version': (1, 0),
+    'wsgi.multithread': False,
+    'wsgi.multiprocess': False,
+    'wsgi.run_once': False
+}
 
 
 class GeventWorker(AsyncWorker):
@@ -98,15 +107,9 @@ class GeventWorker(AsyncWorker):
             s.setblocking(1)
             pool = Pool(self.worker_connections)
             if self.server_class is not None:
-                environ = base_environ(self.cfg)
-                environ.update({
-                    "wsgi.multithread": True,
-                    "SERVER_SOFTWARE": VERSION,
-                })
                 server = self.server_class(
                     s, application=self.wsgi, spawn=pool, log=self.log,
-                    handler_class=self.wsgi_handler, environ=environ,
-                    **ssl_args)
+                    handler_class=self.wsgi_handler, **ssl_args)
             else:
                 hfun = partial(self.handle, s)
                 server = StreamServer(s, handle=hfun, spawn=pool, **ssl_args)
@@ -235,7 +238,7 @@ class PyWSGIHandler(pywsgi.WSGIHandler):
 
 
 class PyWSGIServer(pywsgi.WSGIServer):
-    pass
+    base_env = BASE_WSGI_ENV
 
 
 class GeventPyWSGIWorker(GeventWorker):
